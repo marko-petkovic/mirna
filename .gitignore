@@ -3,3 +3,4 @@
 *.png
 miRNAgeneration/newrna/augmentor_default_2/new_mirna_data.npy
 miRNAgeneration/newrna/augmentor_default/new_mirna_data.npy
+miRNAgeneration/newrna/augmentor_default_3/new_mirna_data.npy

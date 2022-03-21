@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 
 class Augmentor:
-    def __init__(self, file_loc='D:/users/Marko/downloads/mirna/data/'):
+    def __init__(self, file_loc='D:/users/Marko/downloads/mirna/data/', lim = 15):
         
         self.length_table = {('A','U'):2,('U','A'):2,('C','G'):1,
                     ('G','C'):1,('G','U'):3,('U','G'):3,
@@ -28,13 +28,15 @@ class Augmentor:
         self.x_len_max = np.argmax(x_len, 1)
         self.x_bar_max = np.argmax(x_bar, 1)
         
-        self.parse_images()
+        self.parse_images(lim)
         
-    def parse_images(self):
+    def parse_images(self, lim):
         self.top = []
         self.bot = []
         self.top_bonds = []
         self.bot_bonds = []
+        self.loop_seq = []
+        self.loop_str = []
         for i in tqdm(range(self.images.shape[0])):
             topstr=''
             botstr=''
@@ -60,11 +62,15 @@ class Augmentor:
                     bot_bond.append('|')
                 else:
                     bot_bond.append('.')
+                    
+            loop_seq, loop_str = self.calculate_terminal_loop_length(topstr, botstr, lim)
+            
             self.top.append(topstr)
             self.bot.append(botstr)
             self.top_bonds.append(top_bond)
             self.bot_bonds.append(bot_bond)
-    
+            self.loop_seq.append(loop_seq)
+            self.loop_str.append(loop_str)
     
     def augment_mirna(self, idx, swap_prob=.1, fill_prob=.2, remove_prob=.2,
                       strong_prob=.1, weak_prob=.1, mix_prob=.25,
@@ -75,10 +81,10 @@ class Augmentor:
         tb = self.top_bonds[idx].copy()
         bb = self.bot_bonds[idx].copy()
         
-        tn,bn,tb,bb = self.swap_nucleotides(tn,bn,tb,bb,lent,swap_prob)
-        tn,bn,tb,bb = self.change_gap(tn,bn,tb,bb,lent,fill_prob,remove_prob)
-        tn,bn,tb,bb = self.change_bond(tn,bn,tb,bb,lent,strong_prob,weak_prob)
-        tn,bn,tb,bb = self.mix_chunks(tn,bn,tb,bb,lent,mix_prob,reverse_prob,chunk_size)
+        tn,bn,tb,bb = self.swap_nucleotides(idx,tn,bn,tb,bb,lent,swap_prob)
+        tn,bn,tb,bb = self.change_gap(idx,tn,bn,tb,bb,lent,fill_prob,remove_prob)
+        tn,bn,tb,bb = self.change_bond(idx,tn,bn,tb,bb,lent,strong_prob,weak_prob)
+        tn,bn,tb,bb = self.mix_chunks(idx,tn,bn,tb,bb,lent,mix_prob,reverse_prob,chunk_size)
         rec = self.reconstruct_image(tn,bn,tb,bb,lent)
 
         return rec
@@ -98,16 +104,16 @@ class Augmentor:
         
         np.save(out_folder + '/new_mirna_data.npy', new_rna)
     
-    def swap_nucleotides(self, top, bot, top_bond, bot_bond, lent, prob=.2):
-        for i in range(8,lent):
+    def swap_nucleotides(self, idx, top, bot, top_bond, bot_bond, lent, prob=.2):
+        for i in range(max(8,self.loop_seq[idx]),lent):
             if np.random.uniform() < prob:
                 top[i], bot[i] = bot[i],top[i]
                 top_bond[i], bot_bond[i] = bot_bond[i], top_bond[i]
 
         return top, bot, top_bond, bot_bond
 
-    def change_gap(self, top, bot, top_bond, bot_bond, lent, prob_fill=.2, prob_remove=.2):
-        for i in range(8,lent):
+    def change_gap(self, idx, top, bot, top_bond, bot_bond, lent, prob_fill=.2, prob_remove=.2):
+        for i in range(max(8, self.loop_seq[idx]),lent):
             if top[i] != 'Z' and bot[i] != 'Z':
                 if np.random.uniform() < prob_remove:
                     if np.random.uniform() < .5:
@@ -132,8 +138,8 @@ class Augmentor:
                     bot_bond[i] = '|'
         return top, bot, top_bond, bot_bond
     
-    def change_bond(self, top, bot, top_bond, bot_bond, lent, prob_make_strong=.1, prob_make_weak=.1):
-        for i in range(8, lent):
+    def change_bond(self, idx, top, bot, top_bond, bot_bond, lent, prob_make_strong=.1, prob_make_weak=.1):
+        for i in range(max(8, self.loop_seq[idx]), lent):
             if self.is_strong_bond(top[i],bot[i]):
                 if np.random.uniform() < prob_make_weak:
                     top[i], bot[i] = self.get_weak_bond()
@@ -146,18 +152,19 @@ class Augmentor:
                     bot_bond[i] = '|'
         return top, bot, top_bond, bot_bond
     
-    def mix_chunks(self, top, bot, top_bond, bot_bond, lent, prob=.3, prob_reverse=.3,chunk_length=9):
+    def mix_chunks(self, idx, top, bot, top_bond, bot_bond, lent, prob=.3, prob_reverse=.3,chunk_length=9):
         chunks = []
-        chunk_idx = np.arange((lent-8)//chunk_length+1)
+        start = max(8, self.loop_seq[idx])
+        chunk_idx = np.arange((lent-start)//chunk_length+1)
         shuffle_list=[]
         shuffle_dict={}
 
         for i in chunk_idx:
             shuffle_dict[i] = i
             if np.random.uniform()<prob_reverse:
-                chunks.append(np.arange(8+i*chunk_length, min(8+(i+1)*chunk_length, lent+1))[::-1])
+                chunks.append(np.arange(start+i*chunk_length, min(start+(i+1)*chunk_length, lent+1))[::-1])
             else:
-                chunks.append(np.arange(8+i*chunk_length, min(8+(i+1)*chunk_length, lent+1)))
+                chunks.append(np.arange(start+i*chunk_length, min(start+(i+1)*chunk_length, lent+1)))
             if np.random.uniform()<prob:
                 shuffle_list.append(i)
         shuf = shuffle_list.copy()
@@ -168,7 +175,7 @@ class Augmentor:
 
         chunks = [chunks[i] for i in shuffle_dict.values()]
 
-        order = [i for i in range(8)]+[i for item in chunks for i in item]
+        order = [i for i in range(start)]+[i for item in chunks for i in item]
         top = [top[i] for i in order]
         bot = [bot[i] for i in order]
 
@@ -288,4 +295,13 @@ class Augmentor:
                     k += 1
         return lnt
     
-    
+    def calculate_terminal_loop_length(self, top, bot, lim=10):
+        seq = ''
+        loop_len = 0
+        for i in range(1,lim+1):
+            if list(top[:i+1]) == list(reversed(bot[:i+1])):
+                seq = top[:i+1]
+                loop_len = i
+                
+        return loop_len, seq
+                                       
