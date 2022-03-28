@@ -22,7 +22,8 @@ class Augmentor:
                     ('Z','C'):1,('G','Z'):1,('Z','G'):1,
                     ('Z','Z'):1}
         self.images = np.load(f'{file_loc}/modmirbase_train_images.npz')['arr_0']/255
-        
+        self.labels = np.load(f'{file_loc}/modmirbase_train_labels.npz')['arr_0']
+        self.names = np.load(f'{file_loc}/modmirbase_train_names.npz')['arr_0']
         x_len = np.load(f'{file_loc}/modmirbase_train_images_len.npz')
         x_bar = np.load(f'{file_loc}/modmirbase_train_images_bar.npz')
         self.x_len_max = np.argmax(x_len, 1)
@@ -37,6 +38,10 @@ class Augmentor:
         self.bot_bonds = []
         self.loop_seq = []
         self.loop_str = []
+        
+        
+        self.loop_images = np.ones(self.images.shape, dtype=np.uint8)
+        
         for i in tqdm(range(self.images.shape[0])):
             topstr=''
             botstr=''
@@ -65,13 +70,21 @@ class Augmentor:
                     
             loop_seq, loop_str = self.calculate_terminal_loop_length(topstr, botstr, lim)
             
+            self.loop_images[i,:,:loop_seq+1] = self.images[i,:,:loop_seq+1]
+            
             self.top.append(topstr)
             self.bot.append(botstr)
             self.top_bonds.append(top_bond)
             self.bot_bonds.append(bot_bond)
             self.loop_seq.append(loop_seq)
             self.loop_str.append(loop_str)
-    
+        
+        self.loop_images = self.loop_images[:,:,:50]
+        self.loop_images_bw = self.loop_images.copy()
+        
+        self.loop_images_bw[~(self.loop_images_bw==[1,1,1]).all(axis=3)] = [0,0,0]
+        
+        #self.loop_images_bw = np.where((self.loop_images_bw != np.array([1,1,1])).all(axis=3), [0,0,0], [1,1,1])
     def augment_mirna(self, idx, swap_prob=.1, fill_prob=.2, remove_prob=.2,
                       strong_prob=.1, weak_prob=.1, mix_prob=.25,
                       reverse_prob=.2, chunk_size=9):
