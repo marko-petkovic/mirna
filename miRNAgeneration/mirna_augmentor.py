@@ -6,11 +6,13 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+import math
+
 from tqdm import tqdm
 
 
 class Augmentor:
-    def __init__(self, file_loc='D:/users/Marko/downloads/mirna/data/', lim = 15):
+    def __init__(self, file_loc='D:/users/Marko/downloads/mirna/data/', lim = 15, n = None, ds = 'train'):
         
         self.length_table = {('A','U'):2,('U','A'):2,('C','G'):1,
                     ('G','C'):1,('G','U'):3,('U','G'):3,
@@ -21,11 +23,18 @@ class Augmentor:
                     ('U','Z'):1,('Z','U'):1,('C','Z'):1,
                     ('Z','C'):1,('G','Z'):1,('Z','G'):1,
                     ('Z','Z'):1}
-        self.images = np.load(f'{file_loc}/modmirbase_train_images.npz')['arr_0']/255
-        self.labels = np.load(f'{file_loc}/modmirbase_train_labels.npz')['arr_0']
-        self.names = np.load(f'{file_loc}/modmirbase_train_names.npz')['arr_0']
-        x_len = np.load(f'{file_loc}/modmirbase_train_images_len.npz')
-        x_bar = np.load(f'{file_loc}/modmirbase_train_images_bar.npz')
+        
+        self.ds = ds
+        images = np.load(f'{file_loc}/modmirbase_{ds}_images.npz')['arr_0']/255
+        if n is not None:
+            idx = np.random.permutation(images.shape[0])[:n]
+        else:
+            idx = np.arange(images.shape[0])
+        self.images = images[idx]
+        self.labels = np.load(f'{file_loc}/modmirbase_{self.ds}_labels.npz')['arr_0'][idx]
+        self.names = np.load(f'{file_loc}/modmirbase_{self.ds}_names.npz')['arr_0'][idx]
+        x_len = np.load(f'{file_loc}/modmirbase_{self.ds}_images_len.npz')[idx]
+        x_bar = np.load(f'{file_loc}/modmirbase_{self.ds}_images_bar.npz')[idx]
         self.x_len_max = np.argmax(x_len, 1)
         self.x_bar_max = np.argmax(x_bar, 1)
         
@@ -39,14 +48,24 @@ class Augmentor:
         self.loop_seq = []
         self.loop_str = []
         
+        self.mountain = np.zeros((self.images.shape[0],200),dtype=np.int8)
+        
+        self.bulge_indices_top = []
+        self.bulge_indices_bot = []
         
         self.loop_images = np.ones(self.images.shape, dtype=np.uint8)
+        self.bulg_images = np.ones(self.images.shape, dtype=np.uint8)
+        self.gapp_images = np.ones(self.images.shape, dtype=np.uint8)
         
         for i in tqdm(range(self.images.shape[0])):
             topstr=''
             botstr=''
             top_bond = []
             bot_bond = []
+            bulge_idx_top = []
+            bulge_idx_bot = []
+            z_top = []
+            z_bot = []
             for j in range(self.x_len_max[i]+1):
                 top_col = self.get_color(self.images[i,12,j])
                 bot_col = self.get_color(self.images[i,13,j])
@@ -56,22 +75,31 @@ class Augmentor:
 
                 if top_col == 'Z':
                     top_bond.append('-')
+                    z_top.append(j)
                 elif self.x_bar_max[i, 2*j] == self.length_table[top_col, bot_col]:
                     top_bond.append('|')
                 else:
                     top_bond.append('.')
+                    bulge_idx_top.append(j)
 
                 if bot_col == 'Z':
                     bot_bond.append('-')
+                    z_bot.append(j)
                 elif self.x_bar_max[i, 1+2*j] == self.length_table[top_col, bot_col]:
                     bot_bond.append('|')
                 else:
                     bot_bond.append('.')
+                    bulge_idx_bot.append(j)
                     
             loop_seq, loop_str = self.calculate_terminal_loop_length(topstr, botstr, lim)
             
-            self.loop_images[i,:,:loop_seq+1] = self.images[i,:,:loop_seq+1]
+            self.mountain[i] = self.calculate_mountain_plot(topstr, botstr, top_bond, bot_bond, loop_seq)
             
+            self.loop_images[i,:,:loop_seq+1] = self.images[i,:,:loop_seq+1]
+            self.bulg_images[i,:13, bulge_idx_top] = self.images[i,:13, bulge_idx_top]
+            self.bulg_images[i,13:, bulge_idx_bot] = self.images[i,13:, bulge_idx_bot]
+            self.gapp_images[i,:13, z_top] = self.images[i,:13, z_top]
+            self.gapp_images[i,13:, z_bot] = self.images[i,13:, z_bot] 
             self.top.append(topstr)
             self.bot.append(botstr)
             self.top_bonds.append(top_bond)
@@ -86,8 +114,8 @@ class Augmentor:
         
         #self.loop_images_bw = np.where((self.loop_images_bw != np.array([1,1,1])).all(axis=3), [0,0,0], [1,1,1])
     def augment_mirna(self, idx, swap_prob=.1, fill_prob=.2, remove_prob=.2,
-                      strong_prob=.1, weak_prob=.1, mix_prob=.25,
-                      reverse_prob=.2, chunk_size=9):
+                      strong_prob=.1, weak_prob=.1, mix_prob=.1,
+                      reverse_prob=.1, chunk_size=9):
         lent = self.x_len_max[idx]
         tn = list(self.top[idx])
         bn = list(self.bot[idx])
@@ -104,18 +132,29 @@ class Augmentor:
     
     def generate_augmented_mirna(self, out_folder, k):
         
-        new_rna = np.ones((self.images.shape[0]*k,25,100,3), dtype=np.uint8)
-        
+        new_rna = np.ones((self.images.shape[0]*(k+1),25,100,3), dtype=np.uint8)
+        new_rna_names = np.array(['' for i in range((k+1)*self.images.shape[0])])
+        new_rna_labels = np.zeros((self.labels.shape[0]*(k+1),1))
         for i in tqdm(range(self.images.shape[0])):
             for j in range(k):
-                new_rna[i*k + j] = self.augment_mirna(i)
-        
+                new_rna[i*(k+1) + j] = self.augment_mirna(i)
+                new_rna_names[i*(k+1)+j] = self.names[i]
+                new_rna_labels[i*(k+1)+j] = self.labels[i]
+            new_rna[i*(k+1)+k] = self.images[i]
+            new_rna_names[i*(k+1)+k] = self.names[i]
+            new_rna_labels[i*(k+1)+k] = self.labels[i]
         try:
             os.makedirs(out_folder)
         except:
-            raise ValueError(f"Directory {out_folder} exists!")
+            #raise ValueError(f"Directory {out_folder} exists!")
+            print(f"Directory {out_folder} exists!")
         
-        np.save(out_folder + '/new_mirna_data.npy', new_rna)
+        np.save(out_folder + f'/augmented_{self.ds}_images.npy', new_rna)
+        np.save(out_folder + f'/augmented_{self.ds}_labels.npy', new_rna_labels)
+        np.save(out_folder + f'/augmented_{self.ds}_names.npy', new_rna_names)                          
+    
+    def save_mountain_plots(self, out_folder, name='mountain'):
+        np.save(f'{out_folder}/modmirbase_{self.ds}_{name}.npy', self.mountain)
     
     def swap_nucleotides(self, idx, top, bot, top_bond, bot_bond, lent, prob=.2):
         for i in range(max(8,self.loop_seq[idx]),lent):
@@ -317,4 +356,26 @@ class Augmentor:
                 loop_len = i
                 
         return loop_len, seq
-                                       
+    
+    def calculate_mountain_plot(self, top, bot, top_bond, bot_bond, loop_seq):
+        mount = np.zeros((200,))
+        top_count = 0
+        bot_count = 0
+        if loop_seq != 0:
+            loop_seq += 1
+            top_count = math.ceil((loop_seq+1)/2)
+            bot_count = math.floor((loop_seq+1)/2)
+        for i in range(loop_seq, len(top)):
+            
+            
+            if top_bond[i] == '|':
+                mount[99-top_count] = 1
+            if bot_bond[i] == '|':
+                mount[100+bot_count] = -1
+            
+            if top_bond[i] != '-':
+                top_count+=1
+            if bot_bond[i] != '-':
+                bot_count+=1
+            
+        return mount
