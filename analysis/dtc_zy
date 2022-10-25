@@ -1,0 +1,10 @@
+digraph {
+	"total_length > 9010" [label="total_length > 90 
+17360/17361"]
+	121 [label="non miRNA 
+17359/17152"]
+	"asymmetric is true22" [label="miRNA 
+1/209"]
+	"total_length > 9010" -> 121 [label=no]
+	"total_length > 9010" -> "asymmetric is true22" [label=yes]
+}

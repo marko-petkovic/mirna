@@ -1,0 +1,28 @@
+digraph {
+	"base_pairs_in_stem > 0.510" [label="base_pairs_in_stem > 0.5 
+17360/17361"]
+	"stem_begin > 7521" [label="stem_begin > 75 
+16044/2694"]
+	"stem_length > 5532" [label="non miRNA 
+15686/1621"]
+	"asymmetric is true39" [label="asymmetric is true 
+358/1073"]
+	"stem_length > 90410" [label="miRNA 
+145/986"]
+	"stem_length > 90413" [label="stem_length > 90 
+213/87"]
+	14514 [label="non miRNA 
+172/18"]
+	15515 [label="miRNA 
+41/69"]
+	"stem_length > 90413" -> 14514 [label=no]
+	"stem_length > 90413" -> 15515 [label=yes]
+	"asymmetric is true39" -> "stem_length > 90410" [label=no]
+	"asymmetric is true39" -> "stem_length > 90413" [label=yes]
+	"stem_begin > 7521" -> "stem_length > 5532" [label=no]
+	"stem_begin > 7521" -> "asymmetric is true39" [label=yes]
+	"palindrome_score > 0.8216" [label="miRNA 
+1316/14667"]
+	"base_pairs_in_stem > 0.510" -> "stem_begin > 7521" [label=no]
+	"base_pairs_in_stem > 0.510" -> "palindrome_score > 0.8216" [label=yes]
+}
