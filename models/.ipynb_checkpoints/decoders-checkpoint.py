@@ -66,7 +66,6 @@ class bar_color_conv(nn.Module):
         
     def forward(self, h):
         
-        #h = h.view(-1,32,12,3)
         h = h.sum(dim=3)
         col = self.bar_color(h)[:,:,None,4:-4]
         col = torch.cat([col[:,:5,:,:],col[:,5:,:,:]], dim=2)
@@ -163,32 +162,7 @@ class decoder(nn.Module):
         
         
         col = nn.Softmax(dim=1)(self.color(h))
-        len_bar = self.length(h)
-                                
- #       h1 = self.fc1(z)
-#         # apply dropout if necesary
-#         if self.drop1 > 0:
-#             h1_d = nn.Dropout(self.drop1)(h1)
-#         else:
-#             h1_d = h1
-        
-#         h2 = self.fc2(h1_d)
-#         # apply dropout if necesary
-#         if self.drop2 > 0:
-#             h2_d = nn.Dropout(self.drop2)(h2)
-#         else:
-#             h2_d = h2
-            
-#         if self.length_sttng == "fc":
-#             len_bar = self.length(h2_d)
-#         elif self.length_sttng == "conv":
-#             len_bar = self.length(h1)
-        
-#         if self.color_sttng == "fc":
-#             col = nn.Softmax(dim=1)(self.color(h2_d))
-#         elif self.color_sttng == "conv":
-#             col = nn.Softmax(dim=1)(self.color(h1))
-        
+        len_bar = self.length(h)                       
         
         # create "distribution" over image for bars
         len_bar_top_ = nn.Softmax(dim=2)(len_bar[:,0,:,:13]).flip(2)
@@ -219,16 +193,7 @@ class decoder(nn.Module):
             
             len_bar_top_ = F.one_hot(mt, num_classes=13).float()
             len_bar_bot_ = F.one_hot(bt, num_classes=13).float()
-            col = F.one_hot(co, num_classes=5).permute(0,3,1,2).float()
-#             len_bar_top_ = torch.zeros_like(len_bar_t)
-#             len_bar_top_.scatter_(2, mt, 1)
-            
-#             len_bar_bot_ = torch.zeros_like(len_bar_b)
-#             len_bar_bot_.scatter_(2, bt, 1)
-            
-#             col = torch.zeros_like(color)
-#             col.scatter_(1, co, 1)
-            
+            col = F.one_hot(co, num_classes=5).permute(0,3,1,2).float()            
             
             col_top = col[:,:,0,None,:].repeat(1,1,13,1)
             col_bot = col[:,:,1,None,:].repeat(1,1,12,1)
@@ -243,6 +208,7 @@ class decoder(nn.Module):
                                 ).permute(0,1,3,2).repeat(1,5,1,1)
         
             return colors*len_bar_
+        
         if mean:
             bars_t = torch.argmax(len_bar_t, dim=2)
             bars_b = torch.argmax(len_bar_b, dim=2)
