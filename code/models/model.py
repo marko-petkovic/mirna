@@ -83,44 +83,8 @@ class MIRDIVA(nn.Module):
             
                 self.preds_y_ym = y_cls(args.zs[3])
                 self.preds_m_ym = mfe_cls(args.zs[3])
-                self.priors_ym = combined_conv_prior(args.zs[3], args.zs[3], args.bn)
-        
-            
-            
-            
-            
-        else:
-            if self.zs[0] > 0:
-                
-                self.encs_x =  vgg_encoder(args.zs[0], [(5,args.f1),(args.f1, args.f2), (args.f2,args.f3)], [args.k1, args.k2, args.k3], args.pool, args.stride, args.padding, args.bn, args.nonlin)
-            
-            if self.zs[1] > 0:
-                
-                self.encs_y =  vgg_encoder(args.zs[1], [(5,args.f1),(args.f1, args.f2), (args.f2,args.f3)], [args.k1, args.k2, args.k3], args.pool, args.stride, args.padding, args.bn, args.nonlin)
-            
-                self.preds_y = y_cls(args.zs[1], simple=False)
-                self.priors_y = y_prior(args.zs[1], args.bn)
-            
-            if self.zs[2] > 0:
-                
-                self.encs_m =  vgg_encoder(args.zs[2], [(5,args.f1),(args.f1, args.f2), (args.f2,args.f3)], [args.k1, args.k2, args.k3], args.pool, args.stride, args.padding, args.bn, args.nonlin)
-            
-                self.preds_m = mfe_cls(args.zs[2])
-                self.priors_m = mfe_conv_prior(args.zs[2], args.bn)
-                
-                if self.auxs['y_m'] > 0:
-                    self.preds_y_m = y_cls(args.zs[2])
-                
-            
-            if self.zs[3] > 0:
-                
-                self.encs_ym = vgg_encoder(args.zs[3], [(5,args.f1),(args.f1, args.f2), (args.f2,args.f3)], [args.k1, args.k2, args.k3], args.pool, args.stride, args.padding, args.bn, args.nonlin)
-            
-                self.preds_y_ym = y_cls(args.zs[3])
-                self.preds_m_ym = mfe_cls(args.zs[3])
-                self.priors_ym = combined_conv_prior(args.zs[3], args.zs[3], args.bn)
-            
-        
+                self.priors_ym = combined_conv_prior(args.zs[3], args.zs[3], args.bn
+
                 
             
 
