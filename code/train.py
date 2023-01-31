@@ -1,4 +1,4 @@
-from model import *
+from models import mirdiva_no_zy, mirdiva, mirvae
 from utils import *
 
 import wandb

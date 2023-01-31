@@ -120,9 +120,9 @@ class MIRDIVA(nn.Module):
             ldj['y'] = _ldj
             
             # flow m
-            _z_f, _ldj = self.flows_x(z_0['m'], c)
-            z_f['m'] = _z_f
-            ldj['m'] = _ldj
+            _z_f, _ldj = self.flows_x(z_0[i], c)
+            z_f[i] = _z_f
+            ldj[i] = _ldj
             
         else:
             z_f['x'] = z_0['x']
@@ -202,7 +202,7 @@ class MIRDIVA(nn.Module):
                 ldj[i] = 0
             
             preds['y_ym'] = self.preds_y_ym(z_f[i])
-            preds['m_ym'] = self.preds_m_ym(z_f[i]) 
+            preds['m_ym'] = self.preds_m_ym(z_f[i])
         
             
         # decoding
